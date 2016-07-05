@@ -20,7 +20,7 @@
 */
 
 #include "grbl.h"
-
+#include "sdcard.h"
 
 // Declare system global variable structure
 system_t sys; 
@@ -38,6 +38,7 @@ int main(void)
   sys.abort = true;   // Set abort to complete initialization
   sei(); // Enable interrupts
 
+  sdcard_init();
   // Check for power-up and set system alarm if homing is enabled to force homing cycle
   // by setting Grbl's alarm state. Alarm locks out all g-code commands, including the
   // startup scripts, but allows access to settings and internal commands. Only a homing

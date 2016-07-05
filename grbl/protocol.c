@@ -20,13 +20,14 @@
 */
 
 #include "grbl.h"
+#include "sdcard.h"
 
 // Define different comment types for pre-parsing.
 #define COMMENT_NONE 0
 #define COMMENT_TYPE_PARENTHESES 1
 #define COMMENT_TYPE_SEMICOLON 2
 
-
+static uint8_t sdcard_mode = 0;
 static char line[LINE_BUFFER_SIZE]; // Line to be executed. Zero-terminated.
 
 
@@ -37,7 +38,6 @@ static void protocol_execute_line(char *line)
 {      
   protocol_execute_realtime(); // Runtime command check point.
   if (sys.abort) { return; } // Bail to calling function upon system abort  
-
   #ifdef REPORT_ECHO_LINE_RECEIVED
     report_echo_line_received(line);
   #endif
@@ -49,7 +49,9 @@ static void protocol_execute_line(char *line)
   } else if (line[0] == '$') {
     // Grbl '$' system command
     report_status_message(system_execute_line(line));
-    
+  } else if (line[0] == '#') {
+    sdcard_mode = ~(sdcard_mode);
+    sdcard_open_file(line + 1);
   } else if (sys.state == STATE_ALARM) {
     // Everything else is gcode. Block if in alarm mode.
     report_status_message(STATUS_ALARM_LOCK);
@@ -95,6 +97,36 @@ void protocol_main_loop()
   uint8_t char_counter = 0;
   uint8_t c;
   for (;;) {
+
+    if(sdcard_mode){
+        char* none_gcode = ";:()";
+        char* sd_line = sdcard_get_line();
+        /*Grab line from sdcard*/
+        printString(sd_line);
+        /*Remove trailing new line*/
+        char *pos;
+        if ((pos=strchr(sd_line, '\n')) != NULL)
+            *pos = '\0';
+
+        /*Remove comments from parsing*/
+        pos = strpbrk(sd_line, none_gcode);
+        *pos = '\0';
+        /*Remove whitespacing*/        
+        char *write = sd_line, *read = sd_line;
+        do {
+            if (*read != ' ')
+                *write++ = *read;
+        } while (*read++);
+
+        /*Feed it to protocol exeucte line*/
+        protocol_execute_line(sd_line);
+        /*Execute this till eol*/
+		if(sdcard_eol()) {
+            /*Reset sdcard flag*/
+            sdcard_close_file();
+            sdcard_mode = 0;
+        }
+    }
 
     // Process one line of incoming serial data, as the data becomes available. Performs an
     // initial filtering by removing spaces and comments and capitalizing all letters.
@@ -148,8 +180,10 @@ void protocol_main_loop()
             report_status_message(STATUS_OVERFLOW);
             comment = COMMENT_NONE;
             char_counter = 0;
-          } else if (c >= 'a' && c <= 'z') { // Upcase lowercase
+          /*} else if (c >= 'a' && c <= 'z') { // Upcase lowercase
             line[char_counter++] = c-'a'+'A';
+            Just don't... 
+            */
           } else {
             line[char_counter++] = c;
           }
