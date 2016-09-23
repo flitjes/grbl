@@ -35,7 +35,7 @@ CLOCK      = 16000000
 PROGRAMMER ?= -c arduino -P /dev/ttyACM0 -b 115200 -cwiring
 SOURCE    = main.c motion_control.c gcode.c spindle_control.c coolant_control.c serial.c \
              protocol.c stepper.c eeprom.c settings.c planner.c nuts_bolts.c limits.c \
-             print.c probe.c report.c system.c ff.c mmc_avr.c sdcard.c
+             print.c probe.c report.c system.c ff.c mmc_avr.c sdcard.c jogging.c nunchuck.c twi.c
 BUILDDIR = build
 SOURCEDIR = grbl
 # FUSES      = -U hfuse:w:0xd9:m -U lfuse:w:0x24:m

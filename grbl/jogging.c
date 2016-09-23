@@ -3,6 +3,7 @@
 void jog(AXIS a, float increment);
 void reset_axis(AXIS a);
 char debug_str[50];
+#define delay_debounce 0x3FF
 void jogging_state_machine(struct jog_state_input* data){
     static JOG_STATE state = INIT;
     static JOG_STATE next_state = INIT;
@@ -21,7 +22,7 @@ void jogging_state_machine(struct jog_state_input* data){
             if(!data->button_a && !data->button_b){
                 next_state = JOG_XY;
                 printString("Jogging XY\n");
-                delay = 0x8;
+                delay = delay_debounce;
                 state = WAIT;
             }
         break;
@@ -45,7 +46,11 @@ void jogging_state_machine(struct jog_state_input* data){
             if(!data->button_a){
                 next_state = JOG_Z;
                 printString("Jogging Z\n");
-                delay = 0x8;
+                delay = delay_debounce;
+                state = WAIT;
+            } else {
+                next_state = JOG_XY;
+                delay = delay_debounce;
                 state = WAIT;
             }
         break;
@@ -59,15 +64,19 @@ void jogging_state_machine(struct jog_state_input* data){
             if(!data->button_b){
                 next_state = JOG_XY;
                 printString("Jogging XY\n");
-                delay = 0x8;
+                delay = delay_debounce;
                 state = WAIT;
-            }
-            if(!data->button_a){
+            } else if(!data->button_a){
                 next_state = ZERO_X;
                 printString("Reset zero X?\n");
-                delay = 0x8;
+                delay = delay_debounce;
+                state = WAIT;
+            } else {
+                next_state = JOG_Z;
+                delay = delay_debounce;
                 state = WAIT;
             }
+    
         break;
         case ZERO_X:
             if(!data->button_a){
@@ -76,7 +85,7 @@ void jogging_state_machine(struct jog_state_input* data){
             if(!data->button_a || !data->button_b){
                 next_state = ZERO_Y;
                 printString("Reset zero Y?\n");
-                delay = 0x8;
+                delay = delay_debounce;
                 state = WAIT;
             }
         break;
@@ -87,7 +96,7 @@ void jogging_state_machine(struct jog_state_input* data){
             if(!data->button_a || !data->button_b){
                 next_state = ZERO_Z;
                 printString("Reset zero Z?\n");
-                delay = 0x8;
+                delay = delay_debounce;
                 state = WAIT;
             }
         break;
@@ -98,11 +107,10 @@ void jogging_state_machine(struct jog_state_input* data){
             if(!data->button_a || !data->button_b){
                 next_state = INIT;
                 printString("Jogging back to init\n");
-                delay = 0x8;
+                delay = delay_debounce;
                 state = WAIT;
             }
         case WAIT:
-            /*Ugly way for debouncing*/
             if (delay == 0)
                 state = next_state;
             else
@@ -110,7 +118,6 @@ void jogging_state_machine(struct jog_state_input* data){
         break;
     }
 
-    delay_ms(100);
     
 }
 
@@ -134,21 +141,21 @@ void jog(AXIS a, float increment){
     char float_str[20]; 
     switch(a){
         case X:
-            sprintf(gcode, "%s %s%s\n",JOG_GCODE_BASE,"X", ftoa(float_str, increment, 5));
+            sprintf(gcode, "%s%s%s",JOG_GCODE_BASE,"X", ftoa(float_str, increment, 5));
             printString(gcode);
-            printString(JOG_GCODE_END);
+            protocol_execute_line(gcode);
             printString("\n");
         break;
         case Y:
-            sprintf(gcode, "%s %s%s\n",JOG_GCODE_BASE,"Y", ftoa(float_str, increment, 5));
+            sprintf(gcode, "%s%s%s",JOG_GCODE_BASE,"Y", ftoa(float_str, increment, 5));
             printString(gcode);
-            printString(JOG_GCODE_END);
+            protocol_execute_line(gcode);
             printString("\n");
         break;
         case Z:
-            sprintf(gcode, "%s %s%s\n",JOG_GCODE_BASE,"Z", ftoa(float_str, increment, 5));
+            sprintf(gcode, "%s%s%s",JOG_GCODE_BASE,"Z", ftoa(float_str, increment, 5));
             printString(gcode);
-            printString(JOG_GCODE_END);
+            protocol_execute_line(gcode);
             printString("\n");
         break;
         default:
@@ -161,16 +168,19 @@ void reset_axis(AXIS a){
     char gcode[20];
     switch(a){
         case X:
-            sprintf(gcode, "%s %s\n",RESET_AXIS_BASE,"X0");
+            sprintf(gcode, "%s%s",RESET_AXIS_BASE,"X0");
             printString(gcode);
+            protocol_execute_line(gcode);
         break;
         case Y:
-            sprintf(gcode, "%s %s\n",RESET_AXIS_BASE,"Y0");
+            sprintf(gcode, "%s%s",RESET_AXIS_BASE,"Y0");
             printString(gcode);
+            protocol_execute_line(gcode);
         break;
         case Z:
-            sprintf(gcode, "%s %s\n",RESET_AXIS_BASE,"Z0");
+            sprintf(gcode, "%s%s",RESET_AXIS_BASE,"Z0");
             printString(gcode);
+            protocol_execute_line(gcode);
         break;
         default:
             printString("Incorrect axis\n");

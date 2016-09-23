@@ -21,6 +21,9 @@
 
 #include "grbl.h"
 #include "sdcard.h"
+#include "nunchuck.h"
+#include "jogging.h"
+#include <stdio.h>
 
 // Define different comment types for pre-parsing.
 #define COMMENT_NONE 0
@@ -30,11 +33,12 @@
 static uint8_t sdcard_mode = 0;
 static char line[LINE_BUFFER_SIZE]; // Line to be executed. Zero-terminated.
 
+#define REPORT_ECHO_LINE_RECEIVED
 
 // Directs and executes one line of formatted input from protocol_process. While mostly
 // incoming streaming g-code blocks, this also directs and executes Grbl internal commands,
 // such as settings, initiating the homing cycle, and toggling switch states.
-static void protocol_execute_line(char *line) 
+void protocol_execute_line(char *line) 
 {      
   protocol_execute_realtime(); // Runtime command check point.
   if (sys.abort) { return; } // Bail to calling function upon system abort  
@@ -50,8 +54,13 @@ static void protocol_execute_line(char *line)
     // Grbl '$' system command
     report_status_message(system_execute_line(line));
   } else if (line[0] == '#') {
-    sdcard_mode = ~(sdcard_mode);
-    sdcard_open_file(line + 1);
+      if (line[1] == '#') {
+        printString("SDcard file list:\n");
+        sdcard_scan_files("/");
+      } else {
+          sdcard_mode = 1;
+          sdcard_open_file(line + 1);
+      }
   } else if (sys.state == STATE_ALARM) {
     // Everything else is gcode. Block if in alarm mode.
     report_status_message(STATUS_ALARM_LOCK);
@@ -63,6 +72,9 @@ static void protocol_execute_line(char *line)
 }
 
 
+static struct nunchuck* data;
+static char debug_str[50];
+static int count = 0;
 /* 
   GRBL PRIMARY LOOP:
 */
@@ -96,6 +108,11 @@ void protocol_main_loop()
   uint8_t comment = COMMENT_NONE;
   uint8_t char_counter = 0;
   uint8_t c;
+  static struct jog_state_input js_input;
+  static int button_c_counter = 30;
+  static int button_z_counter = 30;
+  js_input.button_a = 1;
+  js_input.button_b = 1;
   for (;;) {
 
     if(sdcard_mode){
@@ -137,6 +154,32 @@ void protocol_main_loop()
     // exceed 256 characters, but the Arduino Uno does not have the memory space for this.
     // With a better processor, it would be very easy to pull this initial parsing out as a 
     // seperate task to be shared by the g-code parser and Grbl's system commands.
+    if(sys.state == STATE_IDLE){
+        nuchuck_get_data();
+        data = nunchuck_data();
+        js_input.x = data->joy_x_axis;
+        js_input.y = data->joy_y_axis;
+         
+        if(js_input.button_a != data->c_button){
+            button_c_counter--;
+        }
+
+        if(button_c_counter == 0){
+            js_input.button_a = data->c_button;
+            button_c_counter = 30;
+        }
+        
+        if(js_input.button_b != data->z_button){
+            button_z_counter--;
+        }
+
+        if(button_z_counter == 0){
+            js_input.button_b = data->z_button;
+            button_z_counter = 30;
+        }
+        
+        jogging_state_machine(&js_input);
+    }
     
     while((c = serial_read()) != SERIAL_NO_DATA) {
       if ((c == '\n') || (c == '\r')) { // End of line reached

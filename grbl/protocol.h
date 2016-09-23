@@ -54,4 +54,6 @@ void protocol_auto_cycle_start();
 // Block until all buffered steps are executed
 void protocol_buffer_synchronize();
 
+void protocol_execute_line(char *line); 
+
 #endif

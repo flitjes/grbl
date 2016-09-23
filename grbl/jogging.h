@@ -3,10 +3,10 @@
 #include "grbl.h"
 #include <stdio.h>
 
-#define JOG_GCODE_BASE "G21 G91 G0"
-#define JOG_GCODE_END "G90 G21"
+#define JOG_GCODE_BASE "G21G91G0"
+#define JOG_GCODE_END "G90G21"
 
-#define RESET_AXIS_BASE "G10 P0 L20"
+#define RESET_AXIS_BASE "G10P0L20"
 
 typedef enum {
     X,
